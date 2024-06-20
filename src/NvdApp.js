@@ -1,11 +1,13 @@
 import './App.css';
 import NvdCategoryList from './components/NvdCategoryList';
 import { useEffect, useState } from 'react';
-import axios from './api/NvdApi'; // Chắc chắn rằng đường dẫn import đúng
+import axios from './api/NvdApi';
 import NvdCategoryForm from './components/NvdCategoryForm';
+
 function NvdApp() {
   const [nvdCategories, setNvdCategories] = useState([]);
   const [nvdCategoryIsForm, setNvdCategoryIsForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
 
   useEffect(() => {
     const getCategories = async () => {
@@ -18,40 +20,70 @@ function NvdApp() {
     };
 
     getCategories();
-  }, []); // useEffect sẽ chỉ gọi một lần sau khi component được mount
+  }, []);
 
-  const nvdHandleAddNew = (param) => {
-    setNvdCategoryIsForm(param);
+  const nvdHandleAddNew = () => {
+    setEditingCategory(null);
+    setNvdCategoryIsForm(true);
   };
 
-  const nvdHandleCategoryCloseForm = (param) => {
-    setNvdCategoryIsForm(param);
+  const nvdHandleCategoryCloseForm = () => {
+    setNvdCategoryIsForm(false);
   };
 
-  const nvdHandleCategorySubmit = (param) => {
-    // Lưu ý rằng bạn nên sử dụng cách thức bảo đảm tính nhất quán trong việc cập nhật state của React
-    // Thay vì sử dụng push để cập nhật nvdCategories, hãy sử dụng setNvdCategories để đảm bảo tính bất biến của state
-    // Ví dụ: setNvdCategories([...nvdCategories, param]);
+  const nvdHandleCategorySubmit = async (category) => {
+    if (editingCategory) {
+      try {
+        const updatedCategory = await axios.put(`NvdCategory/${category.nvdId}`, category);
+        setNvdCategories(
+          nvdCategories.map((cat) =>
+            cat.nvdId === updatedCategory.data.nvdId ? updatedCategory.data : cat
+          )
+        );
+      } catch (error) {
+        console.log("Lỗi:", error);
+      }
+    } else {
+      try {
+        const newCategory = await axios.post("NvdCategory", category);
+        setNvdCategories([...nvdCategories, newCategory.data]);
+      } catch (error) {
+        console.log("Lỗi:", error);
+      }
+    }
+    setNvdCategoryIsForm(false);
+  };
 
-    let id = parseInt(nvdCategories[nvdCategories.length - 1].nvdId,10);
-    param.nvdId = id + 1;
-    setNvdCategories([...nvdCategories, param]);
+  const nvdHandleDelete = async (nvdId) => {
+    try {
+      await axios.delete(`NvdCategory/${nvdId}`);
+      setNvdCategories(nvdCategories.filter((cat) => cat.nvdId !== nvdId));
+    } catch (error) {
+      console.log("Lỗi:", error);
+    }
+  };
 
-    setNvdCategoryIsForm(false); // Đặt lại trạng thái form sau khi submit thành công
+  const nvdHandleEdit = (category) => {
+    setEditingCategory(category);
+    setNvdCategoryIsForm(true);
   };
 
   return (
     <div className="container border my-3">
       <h1>Nguyễn Văn Được - Call API</h1>
-      <NvdCategoryList renderNvdCategories={nvdCategories} onAddNew={nvdHandleAddNew} />
+      <NvdCategoryList
+        renderNvdCategories={nvdCategories}
+        onAddNew={nvdHandleAddNew}
+        onDelete={nvdHandleDelete}
+        onEdit={nvdHandleEdit}
+      />
       <hr />
-      {nvdCategoryIsForm ? (
+      {nvdCategoryIsForm && (
         <NvdCategoryForm
           onCloseForm={nvdHandleCategoryCloseForm}
           onCategorySubmit={nvdHandleCategorySubmit}
+          editingCategory={editingCategory}
         />
-      ) : (
-        ""
       )}
     </div>
   );
